@@ -1,0 +1,127 @@
+// This Pine Script™ code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © Dynamictradingstrategies
+
+//@version=5
+indicator("5 MIN SCALPING TRADING STRATEGY")
+
+
+length = input(20, title='BB Length')
+mult = input(7, title='BB MultFactor')
+lengthKC = input(20, title='KC Length')
+multKC = input(7, title='KC MultFactor')
+
+useTrueRange = input(true, title='Use TrueRange (KC)')
+
+// Calculate BB
+source = close
+basis = ta.sma(source, length)
+dev = multKC * ta.stdev(source, length)
+upperBB = basis + dev
+lowerBB = basis - dev
+
+// Calculate KC
+ma = ta.sma(source, lengthKC)
+range_1 = useTrueRange ? ta.tr : high - low
+rangema = ta.sma(range_1, lengthKC)
+upperKC = ma + rangema * multKC
+lowerKC = ma - rangema * multKC
+
+sqzOn = lowerBB > lowerKC and upperBB < upperKC
+sqzOff = lowerBB < lowerKC and upperBB > upperKC
+noSqz = sqzOn == false and sqzOff == false
+
+val = ta.linreg(source - math.avg(math.avg(ta.highest(high, lengthKC), ta.lowest(low, lengthKC)), ta.sma(close, lengthKC)), lengthKC, 0)
+
+
+
+bcolor = if (val > 0)
+    if (val > nz(val[1]))
+        color.lime
+    else
+        color.green
+else
+    if (val < nz(val[1]))
+        color.red
+    else
+        color.maroon
+
+scolor = if (noSqz)
+    color.blue
+else
+    if (sqzOn)
+        color.black
+    else
+        color.gray
+
+plot(val, color=bcolor, style=plot.style_histogram, linewidth=4)
+plot(0, color=scolor, style=plot.style_cross, linewidth=2)
+
+[diplus, diminus, adx] = ta.dmi(14, 14)
+SEMA = ta.ema(close,9)
+LEMA = ta.ema(close,21)
+EEMA = ta.ema(close,5)
+
+
+/////////////
+
+tradetime = input.session(title='tradetime', defval='0915-1515')
+timeframe = input.timeframe(title='tradetime', defval='15')
+sqoff     = input.session(title='sqoff', defval='1445-1500')
+
+barsinsession(tradetime) =>
+    time(timeframe, tradetime) 
+
+//////// 2nd Method //////////
+
+insession = na(barsinsession(tradetime)) == false
+sqoffsession = na(barsinsession(sqoff)) == false
+
+/////////////////
+
+buy =  val > 0 and SEMA > LEMA and insession  and adx > adx[1] and val > val[1] and low < SEMA
+sell = ta.crossunder(val,0) 
+
+short = val < 0 and SEMA < LEMA  and insession  and adx > adx[1] and val < val[1] and high > SEMA
+cover = ta.crossover(val,0)
+
+
+var islong = false
+var issell = false
+var isshort = false
+var iscover = false
+
+
+buy := not islong and buy
+sell := not issell and sell
+
+short := not isshort and short
+cover := not iscover and cover
+
+if buy
+    islong := true
+    issell := false
+
+if sell
+    islong :=false
+    issell :=true
+    
+if short
+    isshort :=true
+    iscover :=false
+    
+if cover
+    isshort :=false
+    iscover :=true
+
+plotshape(buy , title = "BUY", style = shape.triangleup, text = "BUY", color = color.green, textcolor = color.white, location = location.belowbar, size = size.small, force_overlay = true)
+plotshape(sell, title = "SELL", style = shape.triangledown, text = "SELL", color = color.red, textcolor = color.white, location = location.abovebar,size = size.small, force_overlay = true)
+
+plotshape(short, title = "SHORT", style = shape.triangledown, text = "SHORT", color = color.red, textcolor = color.white, location = location.abovebar, size = size.small, force_overlay = true)
+plotshape(cover, title = "COVER", style = shape.triangleup, text = "COVER", color = color.green, textcolor = color.white, location = location.belowbar,size = size.small, force_overlay = true)
+
+
+plot(SEMA, color = color.red, force_overlay = true)
+plot(LEMA, color = color.green, force_overlay = true)
+
+
+barcolor(val > 0 ? color.green : color.red)
